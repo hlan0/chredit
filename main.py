@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pygame
@@ -94,18 +95,21 @@ def colorize(tile, palettes, palette_index):
     return arr
 
 
-SCALE = 4
+SCALE = 2
 
 
 class Selection(pygame.sprite.Sprite):
     def __init__(self, app, x, y, size):
         self.app = app
+        self.update_size(size)
+        self.rect.x = x
+        self.rect.y = y
+
+    def update_size(self, size):
         self.size = size
         self.image = pygame.Surface((size * SCALE, size * SCALE), pygame.SRCALPHA)
         self.image.fill((255, 255, 255, 64))
         self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
 
 
 class App:
@@ -129,7 +133,7 @@ class App:
         self.selected_palette = 0
         self.palette_index = 0
 
-        self.metatiles = [[0, 0, 0, 0] for i in range(48)]
+        self.metatiles = [[1, 2, 17, 18] for i in range(48)]
         self.metatile_palettes = [0] * 48
         self.metatile_sprites = []
         for i in range(48):
@@ -144,7 +148,10 @@ class App:
             y = i // 6 * 16 * SCALE
             self.metametatile_sprites.append(MetaMetaTile(self, x, y, i))
 
+        self.rooms = [np.zeros((6, 8), dtype=int) for i in range(48)]
+
         self.selected_tile = 0
+        self.selected_metatile = 0
         self.selection = Selection(self, 0, 0, 8)
         self.show_selection = False
 
@@ -157,6 +164,37 @@ class App:
         binary_data = bytes(int(a, 2).to_bytes((len(a) + 7) // 8, byteorder='big'))
         with open("a.chr", "wb") as f:
             f.write(binary_data)
+
+    def write_to_file(self, destination_folder):
+        with open(os.path.join(destination_folder, "metatiles.h"), "w") as file:
+            file.write('const unsigned char metatiles[] = {\n')
+            for i in range(48):
+                file.write('\t')
+                for j in range(4):
+                    file.write(f'{self.metatiles[i][j]}, ')
+                file.write(f'{self.metatile_palettes[i]}, ')
+                file.write('\n')
+            file.write('};\n\n')
+
+        with open(os.path.join(destination_folder, "metametatiles.h"), "w") as file:
+            file.write('const unsigned char metametatiles[] = {\n')
+            for i in range(48):
+                file.write('\t')
+                for j in range(4):
+                    file.write(f'{self.metametatiles[i][j]}, ')
+                file.write('\n')
+            file.write('};\n\n')
+
+        with open(os.path.join(destination_folder, "rooms.h"), "w") as file:
+            for i in range(48):
+                file.write(f'const unsigned char room_{i}[] = ')
+                file.write('{\n')
+                for j in range(6):
+                    file.write('\t')
+                    for k in range(8):
+                        file.write(f'{self.rooms[i][j][k]}, ')
+                    file.write('\n')
+                file.write('};\n\n')
 
     def events(self):
         for event in pygame.event.get():
@@ -191,14 +229,15 @@ class App:
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    for sprite in self.tile_sprites.sprites() + self.metatile_sprite_group.sprites():
+                    for sprite in self.tile_sprites.sprites() + self.metatile_sprite_group.sprites() + self.metametatile_sprite_group.sprites():
                         sprite.check_click(event.pos)
             elif event.type == pygame.MOUSEMOTION:
-                x, y = event.pos[0] // (8 * SCALE), event.pos[1] // (8 * SCALE)
-                self.selection.rect.x = x * (8 * SCALE)
-                self.selection.rect.y = y * (8 * SCALE)
-                if event.buttons[0]:
-                    for sprite in self.tile_sprites.sprites() + self.metatile_sprite_group.sprites():
+                #x, y = event.pos[0] // (8 * SCALE), event.pos[1] // (8 * SCALE)
+                #self.selection.rect.x = x * (8 * SCALE)
+                #self.selection.rect.y = y * (8 * SCALE)
+                for sprite in self.tile_sprites.sprites() + self.metatile_sprite_group.sprites() + self.metametatile_sprite_group.sprites():
+                    sprite.check_mouseover(event.pos)
+                    if event.buttons[0]:
                         sprite.check_click(event.pos)
 
     def run(self):
@@ -209,6 +248,9 @@ class App:
             if self.mode == 'tiles' or self.mode == 'metatiles':
                 self.tile_sprites.update()
                 self.tile_sprites.draw(self.screen)
+            if self.mode == 'metametatiles':
+                self.metametatile_sprite_group.update()
+                self.metametatile_sprite_group.draw(self.screen)
             if self.mode == 'metatiles' or self.mode == 'metametatiles':
                 self.metatile_sprite_group.update()
                 self.metatile_sprite_group.draw(self.screen)
@@ -239,15 +281,38 @@ class MetaMetaTile(pygame.sprite.Sprite):
         self.rect.y = y
 
     def update_tiles(self):
+        colorized = np.zeros((3, 32, 32), dtype=int)
         for i in range(4):
             metatile = self.app.metatile_sprites[self.metatiles[i]]
             arr_x = i % 2 * 16
             arr_y = i // 2 * 16
             self.arr[arr_y:arr_y+16, arr_x:arr_x+16] = metatile.arr
-        self.image = pygame.transform.scale(pygame.surfarray.make_surface(colorize(self.arr, self.app.palettes, 0).T), (32 * SCALE, 32 * SCALE))
+            colorized[:, arr_y:arr_y+16, arr_x:arr_x+16] = colorize(metatile.arr, self.app.palettes, metatile.palette)
+        #self.image = pygame.transform.scale(pygame.surfarray.make_surface(colorize(self.arr, self.app.palettes, 0).T), (16 * SCALE, 16 * SCALE))
+        self.image = pygame.transform.scale(pygame.surfarray.make_surface(colorized.T), (16 * SCALE, 16 * SCALE))
+
+    def update(self):
+        self.update_tiles()
 
     def check_click(self, pos):
-        pass
+        if self.app.mode == 'metametatiles':
+            if self.rect.collidepoint(pos):
+                x = (pos[0] - self.rect.x) // (SCALE * 8)
+                y = (pos[1] - self.rect.y) // (SCALE * 8)
+                metatile_index = y * 2 + x
+                self.metatiles[metatile_index] = self.app.selected_metatile
+                self.app.metametatiles[self.index] = self.metatiles
+                self.update_tiles()
+
+    def check_mouseover(self, pos):
+        if self.rect.collidepoint(pos):
+            selection_size = 16 if self.app.mode == 'rooms' else 8
+            if self.app.selection.size != selection_size:
+                self.app.selection.update_size(selection_size)
+            x = (pos[0] - self.rect.x) // (SCALE * selection_size)
+            y = (pos[1] - self.rect.y) // (SCALE * selection_size)
+            self.app.selection.rect.x = self.rect.x + (x * selection_size * SCALE)
+            self.app.selection.rect.y = self.rect.y + (y * selection_size * SCALE)
 
 
 class MetaTile(pygame.sprite.Sprite):
@@ -278,6 +343,19 @@ class MetaTile(pygame.sprite.Sprite):
                 self.tiles[metatile_index] = self.app.selected_tile
                 self.palette = self.app.selected_palette
                 self.app.metatile_palettes[self.index] = self.app.selected_palette
+        if self.app.mode == 'metametatiles':
+            if self.rect.collidepoint(pos):
+                self.app.selected_metatile = self.index
+
+    def check_mouseover(self, pos):
+        if self.rect.collidepoint(pos):
+            selection_size = 16 if self.app.mode == 'metametatiles' else 8
+            if self.app.selection.size != selection_size:
+                self.app.selection.update_size(selection_size)
+            x = (pos[0] - self.rect.x) // (SCALE * selection_size)
+            y = (pos[1] - self.rect.y) // (SCALE * selection_size)
+            self.app.selection.rect.x = self.rect.x + (x * selection_size * SCALE)
+            self.app.selection.rect.y = self.rect.y + (y * selection_size * SCALE)
 
     def update_tiles(self):
         for i in range(4):
@@ -320,6 +398,15 @@ class Tiles(pygame.sprite.Sprite):
                 tile_index = y * 16 + x
                 self.app.selected_tile = tile_index
 
+    def check_mouseover(self, pos):
+        if self.rect.collidepoint(pos):
+            if self.app.mode == 'metatiles' and self.app.selection.size != 8:
+                self.app.selection.update_size(8)
+            x = pos[0] - self.rect.x
+            y = pos[1] - self.rect.y
+            self.app.selection.rect.x = self.rect.x + (x // (8 * SCALE)) * (8 * SCALE)
+            self.app.selection.rect.y = self.rect.y + (y // (8 * SCALE)) * (8 * SCALE)
+
     def update(self):
         self.image = pygame.transform.scale(pygame.surfarray.make_surface(colorize(self.tile, self.app.palettes, self.app.selected_palette).T), (128 * SCALE, 128 * SCALE))
 
@@ -342,6 +429,9 @@ class ColorScale(pygame.sprite.Sprite):
             self.app.selected_palette = self.palette
             self.app.palette_index = x
 
+    def check_mouseover(self, pos):
+        pass
+
 
 if __name__ == '__main__':
     """
@@ -362,4 +452,4 @@ if __name__ == '__main__':
     color_scale_3 = ColorScale(app, 0, 128 * SCALE + 12 * SCALE, 3)
 
     app.run()
-
+    app.write_to_file("res")
