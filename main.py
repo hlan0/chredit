@@ -1,8 +1,11 @@
+import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pygame
+import tkinter as tk
 
+from tkinter import filedialog
 from pygame.locals import HWSURFACE, DOUBLEBUF, RESIZABLE
 
 
@@ -114,7 +117,14 @@ class Selection(pygame.sprite.Sprite):
 
 class App:
     def __init__(self, file_path=None):
-        self.table_a, self.table_b = read_file(file_path)
+        if file_path is not None:
+            self.table_a, self.table_b = read_file(file_path)
+        else:
+            self.table_a = np.zeros((128, 128), dtype=int)
+            self.table_b = np.zeros((128, 128), dtype=int)
+
+        root = tk.Tk()
+        root.withdraw()
 
         pygame.init()
         self.screen = pygame.display.set_mode((800, 800), HWSURFACE | DOUBLEBUF | RESIZABLE)
@@ -133,7 +143,22 @@ class App:
 
         self.selected_palette = 0
         self.palette_index = 0
+
+        self.initialize_data()
+
+        self.selected_tile = 0
+        self.selected_metatile = 0
+        self.selected_metametatile = 0
         self.active_room = 0
+        self.selection = Selection(self, 0, 0, 8)
+        self.show_selection = False
+
+        self.metatile_selection = Selection(self, 0, 0, 16)
+
+        self.mode = 'tiles'
+
+    def initialize_data(self):
+        self.tiles = Tiles(self, 0, 0)
 
         self.metatiles = [[1, 2, 17, 18] for i in range(48)]
         self.metatile_palettes = [0] * 48
@@ -153,19 +178,41 @@ class App:
         self.rooms = [np.zeros((6, 8), dtype=int) for i in range(48)]
         self.room_sprites = []
         for i in range(48):
-            x = (128 * SCALE) + (i % 6 * 16 * SCALE)
-            y = i // 6 * 16 * SCALE
+            x = 128 * SCALE
+            y = 0
             self.room_sprites.append(Room(self, x, y, i))
 
-        self.selected_tile = 0
-        self.selected_metatile = 0
-        self.selected_metametatile = 0
-        self.selection = Selection(self, 0, 0, 8)
-        self.show_selection = False
+    def export(self):
+        serialized = {
+            'table_a': self.table_a.tolist(),
+            'table_b': self.table_b.tolist(),
+            'metatiles': self.metatiles,
+            'metatile_palettes': self.metatile_palettes,
+            'metametatiles': self.metametatiles,
+            'rooms': [room.tolist() for room in self.rooms]
+        }
+        file_path = filedialog.asksaveasfilename(initialdir=".")
+        with open(file_path, 'w') as file:
+            json.dump(serialized, file)
 
-        self.metatile_selection = Selection(self, 0, 0, 16)
+    def import_data(self):
+        file_path = filedialog.askopenfilename(initialdir=".")
+        with open(file_path, 'r') as file:
+            serialized = json.load(file)
+        self.table_a = np.array(serialized['table_a'])
+        self.table_b = np.array(serialized['table_b'])
+        self.metatiles = serialized['metatiles']
+        self.metatile_palettes = serialized['metatile_palettes']
+        self.metametatiles = serialized['metametatiles']
+        self.rooms = [np.array(room) for room in serialized['rooms']]
 
-        self.mode = 'tiles'
+        self.tiles.tile = self.table_a
+        for mt in self.metatile_sprites:
+            mt.tiles = self.metatiles[mt.index]
+        for mmt in self.metametatile_sprites:
+            mmt.metatiles = self.metametatiles[mmt.index]
+        for room in self.room_sprites:
+            room.metametatiles = self.rooms[room.index]
 
     def save(self):
         a = to_binary(self.table_a) + to_binary(self.table_b)
@@ -213,6 +260,20 @@ class App:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 # replace with UI
+                if event.key == pygame.K_o:
+                    file_path = filedialog.askopenfilename(initialdir=".")
+                    self.table_a, self.table_b = read_file(file_path)
+                    self.tiles.tile = self.table_a
+                if event.key == pygame.K_RIGHT and self.mode == 'rooms':
+                    self.active_room = (self.active_room + 1) % 48
+                if event.key == pygame.K_LEFT and self.mode == 'rooms':
+                    self.active_room = (self.active_room - 1) % 48
+
+                if event.key == pygame.K_e:
+                    self.export()
+                if event.key == pygame.K_i:
+                    self.import_data()
+                   
                 if event.key == pygame.K_s:
                     self.save()
                 if event.key == pygame.K_1:
@@ -516,12 +577,10 @@ if __name__ == '__main__':
     """
 
 
-    app = App('sprites.chr')
-    tiles = Tiles(app, 0, 0)
+    app = App()
     color_scale_0 = ColorScale(app, 0, 128 * SCALE, 0)
     color_scale_1 = ColorScale(app, 0, 128 * SCALE + 4 * SCALE, 1)
     color_scale_2 = ColorScale(app, 0, 128 * SCALE + 8 * SCALE, 2)
     color_scale_3 = ColorScale(app, 0, 128 * SCALE + 12 * SCALE, 3)
 
     app.run()
-    app.write_to_file("res")
