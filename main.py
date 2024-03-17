@@ -1,7 +1,6 @@
 import json
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pygame
 import tkinter as tk
 
@@ -76,17 +75,6 @@ def to_binary(x):
 
     return res
 
-palette_map = [
-    (124,124,124), (0,0,252), (0,0,188), (68,40,188), (148,0,132), (168,0,32), (96,0,0), (136,20,0),
-    (80,48,0), (0,120,0), (0,104,0), (0,88,0), (0,64,88), (0,0,0), (0,0,0), (0,0,0),
-    (188,188,188), (0,120,248), (0,88,248), (104,68,252), (216,0,204), (228,0,88), (152,50,0), (228,92,16),
-    (172,124,0), (0,184,0), (0,168,0), (0,168,68), (0,136,136), (0,0,0), (0,0,0), (0,0,0),
-    (248,248,248), (60,188,252), (104,136,252), (152,120,248), (248,120,248), (248,88,152), (255,141,108), (252,160,68),
-    (248,184,0), (184,248,24), (88,216,84), (88,248,152), (0,232,216), (120,120,120), (0,0,0), (0,0,0),
-    (252,252,252), (164,228,252), (184,184,248), (216,184,248), (248,184,248), (248,164,192), (244,210,198), (252,224,168), (248,216,120),
-    (216,248,120), (184,248,184), (184,248,216), (0,252,252), (248,216,248), (0,0,0), (0,0,0)
-]
-
 
 class App:
     def __init__(self, file_path=None):
@@ -155,6 +143,12 @@ class App:
             y = 0
             self.room_sprites.append(Room(self, x, y, i))
 
+        color_scales = []
+        for i in range(4):
+            x = 0
+            y = 128 * self.SCALE + i * 4 * self.SCALE
+            color_scales.append(ColorScale(self, x, y, i))
+    
     def export(self):
         serialized = {
             'table_a': self.table_a.tolist(),
@@ -183,7 +177,7 @@ class App:
             self.metametatiles = serialized['metametatiles']
             self.rooms = [np.array(room) for room in serialized['rooms']]
 
-            self.tiles.tile = self.table_a
+            self.tiles.raw_tiles = self.table_a
             for mt in self.metatile_sprites:
                 mt.tiles = self.metatiles[mt.index]
             for mmt in self.metametatile_sprites:
@@ -243,7 +237,7 @@ class App:
                     try:
                         file_path = filedialog.askopenfilename(initialdir=".")
                         self.table_a, self.table_b = read_file(file_path)
-                        self.tiles.tile = self.table_a
+                        self.tiles.raw_tiles = self.table_a
                     except:
                         pass
                 if event.key == pygame.K_RIGHT and self.mode == 'rooms':
@@ -298,9 +292,6 @@ class App:
                     for sprite in self.tile_sprites.sprites() + self.metatile_sprite_group.sprites() + self.metametatile_sprite_group.sprites() + self.room_sprite_group.sprites():
                         sprite.check_click(event.pos)
             elif event.type == pygame.MOUSEMOTION:
-                #x, y = event.pos[0] // (8 * self.SCALE), event.pos[1] // (8 * SCALE)
-                #self.selection.rect.x = x * (8 * SCALE)
-                #self.selection.rect.y = y * (8 * SCALE)
                 for sprite in self.tile_sprites.sprites() + self.metatile_sprite_group.sprites() + self.metametatile_sprite_group.sprites() + self.room_sprite_group.sprites():
                     sprite.check_mouseover(event.pos)
                     if event.buttons[0]:
@@ -327,31 +318,10 @@ class App:
 
             if self.mode != 'tiles':
                 self.screen.blit(self.selection.image, self.selection.rect)
-            """
-            for i in range(8):
-                for j in range(8):
-                    pygame.draw.rect(self.screen, (64,64,64), (i*16*SCALE,j*16*SCALE,16*SCALE,16*SCALE), 1)
-            """
             pygame.display.flip()
 
 
-
-
 if __name__ == '__main__':
-    """
-    table_a, table_b = read_file('sprites.chr')
-    with open("a.txt", "r") as f:
-        x = f.read().splitlines()
-    x = [i.split() for i in x]
-    x = np.array(x, dtype=int)
-    attempt = to_binary(x)
-    """
-
-
     app = App()
-    color_scale_0 = ColorScale(app, 0, 128 * app.SCALE, 0)
-    color_scale_1 = ColorScale(app, 0, 128 * app.SCALE + 4 * app.SCALE, 1)
-    color_scale_2 = ColorScale(app, 0, 128 * app.SCALE + 8 * app.SCALE, 2)
-    color_scale_3 = ColorScale(app, 0, 128 * app.SCALE + 12 * app.SCALE, 3)
-
     app.run()
+
