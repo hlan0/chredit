@@ -260,8 +260,7 @@ class App:
                         for i in range(48):
                             x = (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
                             y = i // 6 * 16 * self.SCALE
-                            self.metatile_sprites[i].rect.x = x
-                            self.metatile_sprites[i].rect.y = y
+                            self.metatile_sprites[i].update_pos(x, y)
 
                 if event.key == pygame.K_3:
                     self.mode = 'metametatiles'
@@ -269,14 +268,12 @@ class App:
                         for i in range(48):
                             x = (0 * self.SCALE) + (i % 6 * 16 * self.SCALE)
                             y = i // 6 * 16 * self.SCALE
-                            self.metatile_sprites[i].rect.x = x
-                            self.metatile_sprites[i].rect.y = y
+                            self.metatile_sprites[i].update_pos(x, y)
                     for sprite in self.metametatile_sprites:
                         for i in range(48):
                             x = (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
                             y = i // 6 * 16 * self.SCALE
-                            self.metametatile_sprites[i].rect.x = x
-                            self.metametatile_sprites[i].rect.y = y
+                            self.metametatile_sprites[i].update_pos(x, y)
 
                 if event.key == pygame.K_4:
                     self.mode = 'rooms'
@@ -284,8 +281,7 @@ class App:
                         for i in range(48):
                             x = (0 * self.SCALE) + (i % 6 * 16 * self.SCALE)
                             y = i // 6 * 16 * self.SCALE
-                            self.metametatile_sprites[i].rect.x = x
-                            self.metametatile_sprites[i].rect.y = y
+                            self.metametatile_sprites[i].update_pos(x, y)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
