@@ -14,6 +14,17 @@ PALETTE_MAP = [
 ]
 
 
+TILE_SIZE = 128
+METATILE_SIZE = 16
+METAMETATILE_SIZE = 32
+ROOM_WIDTH = 128
+ROOM_HEIGHT = 96
+COLOR_SCALE_HEIGHT = 4
+COLOR_SCALE_WIDTH = 16
+ROOM_WIDTH = 256
+ROOM_HEIGHT = 192
+
+
 def colorize(tile, palettes, palette_index):
     height, width = tile.shape
     arr = np.zeros((3, height, width))
@@ -48,7 +59,9 @@ class TileBase(pygame.sprite.Sprite):
         pass
 
     def update_image(self):
-        self.image = pygame.transform.scale(pygame.surfarray.make_surface(self.arr.T), (self.width * self.app.SCALE, self.height * self.app.SCALE))
+        self.image = pygame.transform.scale(
+            pygame.surfarray.make_surface(self.arr.T),
+            (self.width * self.app.SCALE, self.height * self.app.SCALE))
         self.rect = self.image.get_rect()
         self.rect.x = self.x
         self.rect.y = self.y
@@ -59,38 +72,50 @@ class TileBase(pygame.sprite.Sprite):
         self.update_image()
 
 
+class ColorTile(TileBase):
+    def __init__(self, app, x, y, index):
+        super().__init__(app, x, y, 4, 4)
+        self.app.tile_sprites.add(self)
+        self.index = index
+        self.arr = np.array(PALETTE_MAP[index]).reshape((3, 1, 1))
+        self.update_image()
+    
+    def check_click(self, pos):
+        if self.rect.collidepoint(pos):
+            self.app.palettes[self.app.selected_palette][self.app.palette_index] = hex(self.index)
+            self.app.color_scales[self.app.selected_palette].arr = colorize(np.array([[0,1,2,3]]), self.app.palettes, self.app.selected_palette)
+
+
 class Tiles(TileBase):
     def __init__(self, app, x, y):
-        super().__init__(app, x, y, 128, 128)
-        self.app = app
+        super().__init__(app, x, y, TILE_SIZE, TILE_SIZE)
         self.app.tile_sprites.add(self)
         self.raw_tiles = self.app.table_a
         self.update_image()
 
     def check_click(self, pos):
-        if self.app.mode == 'tiles':
+        if self.app.mode in ['tiles', 'metatiles']:
             if self.rect.collidepoint(pos):
-                x = pos[0] - self.rect.x
-                y = pos[1] - self.rect.y
-                self.raw_tiles[y//self.app.SCALE, x//self.app.SCALE] = self.app.palette_index
-                self.image = pygame.transform.scale(pygame.surfarray.make_surface(colorize(self.raw_tiles, self.app.palettes, self.app.selected_palette).T), (128 * self.app.SCALE, 128 * self.app.SCALE))
-        elif self.app.mode == 'metatiles':
-            if self.rect.collidepoint(pos):
-                # for now it's 32 because we're scaling by 4
-                x = (pos[0] - self.rect.x) // (self.app.SCALE * 8)
-                y = (pos[1] - self.rect.y) // (self.app.SCALE * 8)
-                tile_index = y * 16 + x
-                self.app.selected_tile = tile_index
+                x = (pos[0] - self.rect.x) // self.app.SCALE
+                y = (pos[1] - self.rect.y) // self.app.SCALE
+                if self.app.mode == 'tiles':
+                    self.raw_tiles[y, x] = self.app.palette_index
+                elif self.app.mode == 'metatiles':
+                    x = x // 8
+                    y = y // 8
+                    tile_index = y * 16 + x
+                    self.app.selected_tile = tile_index
+                self.update_arr()
 
     def check_mouseover(self, pos):
-        if self.app.mode == 'tiles' or self.app.mode == 'metatiles':
+        if self.app.mode in ['tiles', 'metatiles']:
             if self.rect.collidepoint(pos):
                 if self.app.mode == 'metatiles' and self.app.selection.size != 8:
                     self.app.selection.update_size(8)
-                x = pos[0] - self.rect.x
-                y = pos[1] - self.rect.y
-                self.app.selection.rect.x = self.rect.x + (x // (8 * self.app.SCALE)) * (8 * self.app.SCALE)
-                self.app.selection.rect.y = self.rect.y + (y // (8 * self.app.SCALE)) * (8 * self.app.SCALE)
+                x = (pos[0] - self.rect.x) // (8 * self.app.SCALE)
+                y = (pos[1] - self.rect.y) // (8 * self.app.SCALE)
+                self.app.selection.rect.x = self.rect.x + (x * 8 * self.app.SCALE)
+                self.app.selection.rect.y = self.rect.y + (y * 8 * self.app.SCALE)
 
     def update_arr(self):
         self.arr = colorize(self.raw_tiles, self.app.palettes, self.app.selected_palette)
@@ -98,12 +123,12 @@ class Tiles(TileBase):
 
 class MetaTile(TileBase):
     def __init__(self, app, x, y, index):
-        super().__init__(app, x, y, 16, 16)
+        super().__init__(app, x, y, METATILE_SIZE, METATILE_SIZE)
         self.app.metatile_sprite_group.add(self)
         self.tiles = app.metatiles[index]
         self.palette = app.metatile_palettes[index]
         self.index = index
-        self.arr = np.zeros((3, 16, 16), dtype=int)
+        self.arr = np.zeros((3, METATILE_SIZE, METATILE_SIZE), dtype=int)
         self.update_image()
 
     def check_click(self, pos):
@@ -144,11 +169,11 @@ class MetaTile(TileBase):
 
 class MetaMetaTile(TileBase):
     def __init__(self, app, x, y, index):
-        super().__init__(app, x, y, 16, 16)
+        super().__init__(app, x, y, METAMETATILE_SIZE // 2, METAMETATILE_SIZE // 2)
         self.app.metametatile_sprite_group.add(self)
         self.metatiles = app.metametatiles[index]
         self.index = index
-        self.arr = np.zeros((3, 32, 32), dtype=int)
+        self.arr = np.zeros((3, METAMETATILE_SIZE, METAMETATILE_SIZE), dtype=int)
         self.update_image()
 
     def check_click(self, pos):
@@ -183,11 +208,11 @@ class MetaMetaTile(TileBase):
 
 class Room(TileBase):
     def __init__(self, app, x, y, index):
-        super().__init__(app, x, y, 128, 96)
+        super().__init__(app, x, y, ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
         self.app.room_sprite_group.add(self)
         self.metametatiles = app.rooms[index]
         self.index = index
-        self.arr = np.zeros((3, 192, 256), dtype=int)
+        self.arr = np.zeros((3, ROOM_HEIGHT, ROOM_WIDTH), dtype=int)
         self.update_image()
 
     def check_click(self, pos):
@@ -217,7 +242,7 @@ class Room(TileBase):
 
 class ColorScale(TileBase):
     def __init__(self, app, x, y, palette):
-        super().__init__(app, x, y, 16, 4)
+        super().__init__(app, x, y, COLOR_SCALE_WIDTH, COLOR_SCALE_HEIGHT)
         self.app.tile_sprites.add(self)
         self.palette = palette
         self.arr = colorize(np.array([[0,1,2,3]]), self.app.palettes, self.palette)
@@ -243,3 +268,33 @@ class Selection(pygame.sprite.Sprite):
         self.image.fill((255, 255, 255, 64))
         self.rect = self.image.get_rect()
 
+
+class Button(pygame.sprite.Sprite):
+    def __init__(self, app, x, y, width, height, text, on_click=None):
+        super().__init__()
+        self.app = app
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.text = self.app.font.render(text, True, (255, 255, 255))
+        self.background = pygame.Surface((self.width, self.height))
+        self.background.fill((24, 24, 24))
+        self.rect = self.background.get_rect()
+        self.rect.x = self.x
+        self.rect.y = self.y
+        self.on_click = on_click or (lambda: None)
+    
+    def draw(self):
+        self.app.screen.blit(self.background, self.rect)
+        self.app.screen.blit(self.text, (self.x + self.width // 2 - self.text.get_width() // 2, self.y + self.height // 2 - self.text.get_height() // 2))
+
+    def check_mouseover(self, pos):
+        if self.rect.collidepoint(pos):
+            self.background.fill((64, 64, 64))
+        else:
+            self.background.fill((24, 24, 24))
+    
+    def check_click(self, pos):
+        if self.rect.collidepoint(pos):
+            self.on_click()
