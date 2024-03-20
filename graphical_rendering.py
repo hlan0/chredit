@@ -146,7 +146,7 @@ class MetaTile(TileBase):
                 self.app.selected_metatile = self.index
 
     def check_mouseover(self, pos):
-        if self.rect.collidepoint(pos):
+        if self.rect.collidepoint(pos) and self.app.mode in ['metatiles', 'metametatiles']:
             selection_size = 16 if self.app.mode == 'metametatiles' else 8
             if self.app.selection.size != selection_size:
                 self.app.selection.update_size(selection_size)

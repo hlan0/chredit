@@ -83,10 +83,7 @@ class App:
             self.table_a = np.zeros((128, 128), dtype=int)
             self.table_b = np.zeros((128, 128), dtype=int)
 
-        root = tk.Tk()
-        root.withdraw()
-
-        self.SCALE = 4
+        self.SCALE = 2
 
         pygame.init()
 
@@ -112,7 +109,7 @@ class App:
         self.selected_metatile = 0
         self.selected_metametatile = 0
         self.active_room = 0
-        self.selection = Selection(self, 0, 0, 8)
+        self.selection = Selection(self, 8, 8, 8)
         self.show_selection = False
 
         self.mode = 'metatiles'
@@ -141,19 +138,19 @@ class App:
         self.rooms = [np.zeros((6, 8), dtype=int) for i in range(48)]
         self.room_sprites = []
         for i in range(48):
-            x = 128 * self.SCALE
-            y = 0
+            x = 8 + 128 * self.SCALE
+            y = 16 * self.SCALE
             self.room_sprites.append(Room(self, x, y, i))
 
         self.color_scales = []
         for i in range(4):
             x = 8
-            y = (128 + 24 + 8) * self.SCALE + i * 4 * self.SCALE
+            y = (128 * self.SCALE) + (16 * self.SCALE) + 8 + i * 4 * self.SCALE
             self.color_scales.append(ColorScale(self, x, y, i))
         
         for i in range(len(PALETTE_MAP)):
-            x = 128 * self.SCALE + (i % 16) * 4 * self.SCALE
-            y = 128 * self.SCALE + (i // 16) * 4 * self.SCALE
+            x = (16 * self.SCALE) + 16 + (i % 16) * 4 * self.SCALE
+            y = (128 * self.SCALE) + (16 * self.SCALE) + 8 + (i // 16) * 4 * self.SCALE
             a = ColorTile(self, x, y, i)
         
         self.buttons = [
@@ -165,6 +162,8 @@ class App:
         self.buttons.append(Button(self, 72 * self.SCALE + 32, 8, 32 * self.SCALE, 8 * self.SCALE, "Metatiles", self.switch_mode_metatiles))
         self.buttons.append(Button(self, 104 * self.SCALE + 40, 8, 56 * self.SCALE, 8 * self.SCALE, "Metametatiles", self.switch_mode_metametatiles))
         self.buttons.append(Button(self, 160 * self.SCALE + 48, 8, 24 * self.SCALE, 8 * self.SCALE, "Rooms", self.switch_mode_rooms))
+
+        self.buttons.append(Button(self, 16 + 128 * self.SCALE, (16 * self.SCALE) + 8 + 96 * self.SCALE, 8 * self.SCALE, 8 * self.SCALE, "<"))
     
     def export(self):
         serialized = {
@@ -185,6 +184,7 @@ class App:
     def import_data(self):
         try:
             file_path = filedialog.askopenfilename(initialdir=".")
+
             with open(file_path, 'r') as file:
                 serialized = json.load(file)
             self.table_a = np.array(serialized['table_a'])
@@ -269,16 +269,16 @@ class App:
                 self.metatile_sprites[i].update_pos(x, y)
         for sprite in self.metametatile_sprites:
             for i in range(48):
-                x = (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-                y = i // 6 * 16 * self.SCALE
+                x = 8 + (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
+                y = (16 * self.SCALE) + i // 6 * 16 * self.SCALE
                 self.metametatile_sprites[i].update_pos(x, y)
     
     def switch_mode_rooms(self):
         self.mode = 'rooms'
         for sprite in self.metametatile_sprites:
             for i in range(48):
-                x = (0 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-                y = i // 6 * 16 * self.SCALE
+                x = 8 + (0 * self.SCALE) + (i % 6 * 16 * self.SCALE)
+                y = (16 * self.SCALE) + i // 6 * 16 * self.SCALE
                 self.metametatile_sprites[i].update_pos(x, y)
 
     def events(self):
