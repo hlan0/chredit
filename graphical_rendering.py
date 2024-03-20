@@ -84,6 +84,15 @@ class ColorTile(TileBase):
         if self.rect.collidepoint(pos):
             self.app.palettes[self.app.selected_palette][self.app.palette_index] = hex(self.index)
             self.app.color_scales[self.app.selected_palette].arr = colorize(np.array([[0,1,2,3]]), self.app.palettes, self.app.selected_palette)
+    
+    def check_mouseover(self, pos):
+        if self.rect.collidepoint(pos) and self.app.mode == 'metatiles':
+            if self.app.selection.size != 4:
+                self.app.selection.update_size(4)
+            x = (pos[0] - self.rect.x) // (4 * self.app.SCALE)
+            y = (pos[1] - self.rect.y) // (4 * self.app.SCALE)
+            self.app.selection.rect.x = self.rect.x + (x * 4 * self.app.SCALE)
+            self.app.selection.rect.y = self.rect.y + (y * 4 * self.app.SCALE)
 
 
 class Tiles(TileBase):
@@ -134,7 +143,6 @@ class MetaTile(TileBase):
     def check_click(self, pos):
         if self.app.mode == 'metatiles':
             if self.rect.collidepoint(pos):
-                # for now it's 32 because we're scaling by 4
                 x = (pos[0] - self.rect.x) // (self.app.SCALE * 8)
                 y = (pos[1] - self.rect.y) // (self.app.SCALE * 8)
                 metatile_index = y * 2 + x
@@ -189,7 +197,7 @@ class MetaMetaTile(TileBase):
                 self.app.selected_metametatile = self.index
 
     def check_mouseover(self, pos):
-        if self.rect.collidepoint(pos):
+        if self.rect.collidepoint(pos) and self.app.mode in ['metametatiles', 'rooms']:
             selection_size = 16 if self.app.mode == 'rooms' else 8
             if self.app.selection.size != selection_size:
                 self.app.selection.update_size(selection_size)
@@ -253,6 +261,17 @@ class ColorScale(TileBase):
             x = (pos[0] - self.rect.x) // (self.app.SCALE * 4)
             self.app.selected_palette = self.palette
             self.app.palette_index = x
+            self.app.selected_color_x = self.rect.x + (x * 4 * self.app.SCALE) - 1
+            self.app.selected_color_y = self.rect.y - 1
+    
+    def check_mouseover(self, pos):
+        if self.rect.collidepoint(pos) and self.app.mode == 'metatiles':
+            if self.app.selection.size != 4:
+                self.app.selection.update_size(4)
+            x = (pos[0] - self.rect.x) // (self.app.SCALE * 4)
+            y = (pos[1] - self.rect.y) // (self.app.SCALE * 4)
+            self.app.selection.rect.x = self.rect.x + (x * 4 * self.app.SCALE)
+            self.app.selection.rect.y = self.rect.y + (y * 4 * self.app.SCALE)
 
 
 class Selection(pygame.sprite.Sprite):
