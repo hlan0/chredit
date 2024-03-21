@@ -10,6 +10,9 @@ from pygame.locals import HWSURFACE, DOUBLEBUF, RESIZABLE
 from graphical_rendering import Selection, Room, MetaTile, MetaMetaTile, ColorScale, Tiles, ColorTile, PALETTE_MAP, Button
 
 
+WHITE = (255, 255, 255)
+
+
 def read_file(file_path):
     with open(file_path, 'rb') as file:
         raw_data = file.read()
@@ -76,12 +79,9 @@ def to_binary(x):
 
 
 class App:
-    def __init__(self, file_path=None):
-        if file_path is not None:
-            self.table_a, self.table_b = read_file(file_path)
-        else:
-            self.table_a = np.zeros((128, 128), dtype=int)
-            self.table_b = np.zeros((128, 128), dtype=int)
+    def __init__(self):
+        self.table_a = np.zeros((128, 128), dtype=int)
+        self.table_b = np.zeros((128, 128), dtype=int)
 
         self.SCALE = 4
 
@@ -117,77 +117,106 @@ class App:
 
         self.font = pygame.font.Font(None, 8 * self.SCALE)
 
-        self.initialize_data()
+        self.SCREEN_WIDTH = 800
+        self.SCREEN_HEIGHT = 800
+        self.MARGIN_TOP = 8
+        self.MARGIN_LEFT = 8
+        self.MENU_HEIGHT = 16 * self.SCALE
+        
+        self.SPACING = 8
 
-        self.text_left = self.font.render("Tiles", True, (255, 255, 255))
-        self.text_right = self.font.render("Metatiles", True, (255, 255, 255))
-        self.palette_text = self.font.render("Palettes", True, (255, 255, 255))
+        self.PANEL_Y = self.MENU_HEIGHT + 8 * self.SCALE
+        self.RIGHT_PANEL_X = self.MARGIN_LEFT + 128 * self.SCALE + self.SPACING
+        self.BOTTOM_PANEL_Y = self.PANEL_Y + 128 * self.SCALE + self.SPACING
 
-    def initialize_data(self):
-        self.tiles = Tiles(self, 8, 32 * self.SCALE)
+        self.text_left = self.font.render("Tiles", True, WHITE)
+        self.text_right = self.font.render("Metatiles", True, WHITE)
+        self.palette_text = self.font.render("Palettes", True, WHITE)
+
+        self.initialize_panels()
+        self.initialize_buttons()
+        self.initialize_colors()
+    
+    def initialize_buttons(self):
+        button_height = 8
+        button_x = self.MARGIN_LEFT
+
+        button_labels = ["CHR", "Load", "Save", "Export", "Metatiles", "Metametatiles", "Rooms", "Exit"]
+        button_functions = [self.open_chr_file, self.import_data, self.export, self.write_to_file, self.switch_mode_metatiles, self.switch_mode_metametatiles, self.switch_mode_rooms, self.quit]
+
+        self.buttons = []
+        for i, label in enumerate(button_labels):
+            button_width = 24 if len(label) <= 6 else 48
+            self.buttons.append(Button(self, button_x, self.MARGIN_TOP, button_width * self.SCALE, button_height * self.SCALE, label, button_functions[i]))
+            button_x += button_width * self.SCALE + self.SPACING
+
+    def initialize_panels(self):
+        self.tiles = Tiles(self, self.MARGIN_LEFT, self.PANEL_Y)
 
         self.metatiles = [[0, 0, 0, 0] for i in range(48)]
         self.metatile_palettes = [0] * 48
         self.metatile_sprites = []
+
+        tile_size = 16 * self.SCALE
+
         for i in range(48):
-            x = 16 + (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-            y = (32 * self.SCALE) + i // 6 * 16 * self.SCALE
+            offset_x = i % 6 * tile_size
+            offset_y = i // 6 * tile_size
+            x = self.RIGHT_PANEL_X + offset_x
+            y = self.PANEL_Y + offset_y
             self.metatile_sprites.append(MetaTile(self, x, y, i))
 
         self.metametatiles = [[0, 0, 0, 0] for i in range(48)]
         self.metametatile_sprites = []
         for i in range(48):
-            x = 16 + (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-            y = 8 + i // 6 * 16 * self.SCALE
+            offset_x = i % 6 * tile_size
+            offset_y = i // 6 * tile_size
+            x = self.RIGHT_PANEL_X + offset_x
+            y = self.PANEL_Y + offset_y
             self.metametatile_sprites.append(MetaMetaTile(self, x, y, i))
 
         self.rooms = [np.zeros((6, 8), dtype=int) for i in range(48)]
         self.room_sprites = []
         for i in range(48):
-            x = 16 + 128 * self.SCALE
-            y = 32 * self.SCALE
+            x = self.RIGHT_PANEL_X
+            y = self.PANEL_Y
             self.room_sprites.append(Room(self, x, y, i))
-
-        self.color_scales = []
-        for i in range(4):
-            x = 8
-            y = (128 * self.SCALE) + (40 * self.SCALE) + 8 + i * 4 * self.SCALE
-            if self.selected_color_x == 0 and self.selected_color_y == 0:
-                self.selected_color_x = x - 1
-                self.selected_color_y = y - 1
-            self.color_scales.append(ColorScale(self, x, y, i))
         
-        for i in range(len(PALETTE_MAP)):
-            x = 8 + (64 * self.SCALE) + (i % 16) * 4 * self.SCALE
-            y = (128 * self.SCALE) + (40 * self.SCALE) + 8 + (i // 16) * 4 * self.SCALE
-            a = ColorTile(self, x, y, i)
-        
-        self.buttons = [
-            Button(self, 8, 8, 24 * self.SCALE, 8 * self.SCALE, "CHR", self.open_chr_file),
-            Button(self, 24 * self.SCALE + 16, 8, 24 * self.SCALE, 8 * self.SCALE, "Load", self.import_data),
-            Button(self, 48 * self.SCALE + 24, 8, 24 * self.SCALE, 8 * self.SCALE, "Save", self.export),
-            Button(self, 72 * self.SCALE + 32, 8, 24 * self.SCALE, 8 * self.SCALE, "Export", self.write_to_file),
-
-            Button(self, 96 * self.SCALE + 40, 8, 32 * self.SCALE, 8 * self.SCALE, "Metatiles", self.switch_mode_metatiles),
-            Button(self, 128 * self.SCALE + 48, 8, 56 * self.SCALE, 8 * self.SCALE, "Metametatiles", self.switch_mode_metametatiles),
-            Button(self, 184 * self.SCALE + 56, 8, 24 * self.SCALE, 8 * self.SCALE, "Rooms", self.switch_mode_rooms),
-            Button(self, 208 * self.SCALE + 64, 8, 16 * self.SCALE, 8 * self.SCALE, "X", self.quit)
-        ]
-
         self.room_buttons = [
             Button(self, 16 + 128 * self.SCALE, (32 * self.SCALE) + 8 + 96 * self.SCALE, 8 * self.SCALE, 8 * self.SCALE, "<", self.decrease_room),
             Button(self, 32 + (8 * self.SCALE) + 128 * self.SCALE, (32 * self.SCALE) + 8 + 96 * self.SCALE, 8 * self.SCALE, 8 * self.SCALE, ">", self.increase_room)
         ]
     
+    def initialize_colors(self):
+        color_tile_size = 4 * self.SCALE
+
+        self.color_scales = []
+        for i in range(4):
+            x = self.MARGIN_LEFT
+            offset_y = i * color_tile_size
+            y = self.BOTTOM_PANEL_Y + 8 * self.SCALE + offset_y
+            if self.selected_color_x == 0 and self.selected_color_y == 0:
+                self.selected_color_x = x - 1
+                self.selected_color_y = y - 1
+            self.color_scales.append(ColorScale(self, x, y, i))
+        
+        self.all_colors = []
+        for i in range(len(PALETTE_MAP)):
+            offset_x = i % 16 * color_tile_size
+            offset_y = i // 16 * color_tile_size
+            x = self.MARGIN_LEFT + 64 * self.SCALE + offset_x
+            y = self.BOTTOM_PANEL_Y + 8 * self.SCALE + offset_y
+            self.all_colors.append(ColorTile(self, x, y, i))
+        
     def increase_room(self):
         if self.mode == 'rooms':
             self.active_room = (self.active_room + 1) % 48
-            self.text_right = self.font.render(f"Room {self.active_room}", True, (255, 255, 255))
+            self.text_right = self.font.render(f"Room {self.active_room}", True, WHITE)
     
     def decrease_room(self):
         if self.mode == 'rooms':
             self.active_room = (self.active_room - 1) % 48
-            self.text_right = self.font.render(f"Room {self.active_room}", True, (255, 255, 255))
+            self.text_right = self.font.render(f"Room {self.active_room}", True, WHITE)
     
     def export(self):
         serialized = {
@@ -238,44 +267,47 @@ class App:
 
     def write_to_file(self):
         destination_folder = filedialog.askdirectory(initialdir=".")
-        with open(os.path.join(destination_folder, "metatiles.h"), "w") as file:
-            file.write('const unsigned char metatiles[] = {\n')
-            for i in range(48):
-                file.write('\t')
-                for j in range(4):
-                    file.write(f'{self.metatiles[i][j]}, ')
-                file.write(f'{self.metatile_palettes[i]}, ')
-                file.write('\n')
-            file.write('};\n\n')
-
-        with open(os.path.join(destination_folder, "metametatiles.h"), "w") as file:
-            file.write('const unsigned char metametatiles[] = {\n')
-            for i in range(48):
-                file.write('\t')
-                for j in range(4):
-                    file.write(f'{self.metametatiles[i][j]}, ')
-                file.write('\n')
-            file.write('};\n\n')
-
-        with open(os.path.join(destination_folder, "rooms.h"), "w") as file:
-            for i in range(48):
-                file.write(f'const unsigned char room_{i}[] = ')
-                file.write('{\n')
-                for j in range(6):
+        try:
+            with open(os.path.join(destination_folder, "metatiles.h"), "w") as file:
+                file.write('const unsigned char metatiles[] = {\n')
+                for i in range(48):
                     file.write('\t')
-                    for k in range(8):
-                        file.write(f'{self.rooms[i][j][k]}, ')
+                    for j in range(4):
+                        file.write(f'{self.metatiles[i][j]}, ')
+                    file.write(f'{self.metatile_palettes[i]}, ')
                     file.write('\n')
                 file.write('};\n\n')
 
-        with open(os.path.join(destination_folder, "palettes.h"), "w") as file:
-            file.write('const unsigned char palettes[] = {\n')
-            for i in range(4):
-                file.write('\t')
-                for j in range(4):
-                    file.write(f'{self.palettes[i][j]}, ')
-                file.write('\n')
-            file.write('};\n\n')
+            with open(os.path.join(destination_folder, "metametatiles.h"), "w") as file:
+                file.write('const unsigned char metametatiles[] = {\n')
+                for i in range(48):
+                    file.write('\t')
+                    for j in range(4):
+                        file.write(f'{self.metametatiles[i][j]}, ')
+                    file.write('\n')
+                file.write('};\n\n')
+
+            with open(os.path.join(destination_folder, "rooms.h"), "w") as file:
+                for i in range(48):
+                    file.write(f'const unsigned char room_{i}[] = ')
+                    file.write('{\n')
+                    for j in range(6):
+                        file.write('\t')
+                        for k in range(8):
+                            file.write(f'{self.rooms[i][j][k]}, ')
+                        file.write('\n')
+                    file.write('};\n\n')
+
+            with open(os.path.join(destination_folder, "palettes.h"), "w") as file:
+                file.write('const unsigned char palettes[] = {\n')
+                for i in range(4):
+                    file.write('\t')
+                    for j in range(4):
+                        file.write(f'{self.palettes[i][j]}, ')
+                    file.write('\n')
+                file.write('};\n\n')
+        except:
+            pass
     
     def open_chr_file(self):
         try:
@@ -292,32 +324,32 @@ class App:
         self.mode = 'metatiles'
         for i in range(48):
             x = 16 + (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-            y = (32 * self.SCALE) + i // 6 * 16 * self.SCALE
+            y = self.PANEL_Y + i // 6 * 16 * self.SCALE
             self.metatile_sprites[i].update_pos(x, y)
-        self.text_left = self.font.render("Tiles", True, (255, 255, 255))
-        self.text_right = self.font.render("Metatiles", True, (255, 255, 255))
+        self.text_left = self.font.render("Tiles", True, WHITE)
+        self.text_right = self.font.render("Metatiles", True, WHITE)
 
     def switch_mode_metametatiles(self):
         self.mode = 'metametatiles'
         for i in range(48):
             x = 8 + (0 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-            y = (32 * self.SCALE) + i // 6 * 16 * self.SCALE
+            y = self.PANEL_Y + i // 6 * 16 * self.SCALE
             self.metatile_sprites[i].update_pos(x, y)
         for i in range(48):
             x = 16 + (128 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-            y = (32 * self.SCALE) + i // 6 * 16 * self.SCALE
+            y = self.PANEL_Y + i // 6 * 16 * self.SCALE
             self.metametatile_sprites[i].update_pos(x, y)
-        self.text_left = self.font.render("Metatiles", True, (255, 255, 255))
-        self.text_right = self.font.render("Metametatiles", True, (255, 255, 255))
+        self.text_left = self.font.render("Metatiles", True, WHITE)
+        self.text_right = self.font.render("Metametatiles", True, WHITE)
     
     def switch_mode_rooms(self):
         self.mode = 'rooms'
         for i in range(48):
             x = 8 + (0 * self.SCALE) + (i % 6 * 16 * self.SCALE)
-            y = (32 * self.SCALE) + i // 6 * 16 * self.SCALE
+            y = self.PANEL_Y + i // 6 * 16 * self.SCALE
             self.metametatile_sprites[i].update_pos(x, y)
-        self.text_left = self.font.render("Metametatiles", True, (255, 255, 255))
-        self.text_right = self.font.render(f"Room {self.active_room}", True, (255, 255, 255))
+        self.text_left = self.font.render("Metametatiles", True, WHITE)
+        self.text_right = self.font.render(f"Room {self.active_room}", True, WHITE)
     
     def quit(self):
         self.running = False
@@ -341,12 +373,15 @@ class App:
         while self.running:
             self.screen.fill((12, 12, 12))
             self.events()
+
             if self.mode == 'tiles' or self.mode == 'metatiles':
                 self.tile_sprites.update()
                 self.tile_sprites.draw(self.screen)
+
             if self.mode == 'metametatiles' or self.mode == 'rooms':
                 self.metametatile_sprite_group.update()
                 self.metametatile_sprite_group.draw(self.screen)
+
             if self.mode == 'metatiles' or self.mode == 'metametatiles':
                 self.metatile_sprite_group.update()
                 self.metatile_sprite_group.draw(self.screen)
@@ -365,12 +400,12 @@ class App:
                 for button in self.room_buttons:
                     button.draw()
             
-            self.screen.blit(self.text_left, (8, 24 * self.SCALE))
-            self.screen.blit(self.text_right, (16 + 128 * self.SCALE, 24 * self.SCALE))
+            self.screen.blit(self.text_left, (self.MARGIN_LEFT, self.MENU_HEIGHT))
+            self.screen.blit(self.text_right, (self.RIGHT_PANEL_X, self.MENU_HEIGHT))
 
             if self.mode == 'metatiles':
-                self.screen.blit(self.palette_text, (8, (32 * self.SCALE) + (128 * self.SCALE) + 8))
-                pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(self.selected_color_x,self.selected_color_y,4 * self.SCALE + 2,4*self.SCALE + 2), self.SCALE // 2)
+                self.screen.blit(self.palette_text, (self.MARGIN_LEFT, self.BOTTOM_PANEL_Y))
+                pygame.draw.rect(self.screen, WHITE, pygame.Rect(self.selected_color_x,self.selected_color_y,4 * self.SCALE + 2,4*self.SCALE + 2), self.SCALE // 2)
             
             pygame.display.flip()
 
