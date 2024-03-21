@@ -311,7 +311,7 @@ class App:
     
     def open_chr_file(self):
         try:
-            file_path = filedialog.askopenfilename(initialdir=".")
+            file_path = filedialog.askopenfilename(initialdir=".", filetypes=[("CHR Files", "*.chr")])
             self.table_a, self.table_b = read_file(file_path)
             self.tiles.raw_tiles = self.table_a
         except:

@@ -264,6 +264,9 @@ class ColorScale(TileBase):
             self.app.selected_color_x = self.rect.x + (x * 4 * self.app.SCALE) - 1
             self.app.selected_color_y = self.rect.y - 1
     
+    def update_arr(self):
+        self.arr = colorize(np.array([[0,1,2,3]]), self.app.palettes, self.palette)
+    
     def check_mouseover(self, pos):
         if self.rect.collidepoint(pos) and self.app.mode == 'metatiles':
             if self.app.selection.size != 4:
