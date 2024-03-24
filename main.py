@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import filedialog
 from pygame.locals import HWSURFACE, DOUBLEBUF, RESIZABLE
 
-from graphical_rendering import Selection, Room, MetaTile, MetaMetaTile, ColorScale, Tiles, ColorTile, Button
+from entities import Selection, Room, MetaTile, MetaMetaTile, ColorScale, Tiles, ColorTile, Button
 from file_io import FileIO
 from ui_renderer import UIRenderer
 from constants import *
@@ -22,6 +22,9 @@ class App:
         self.table_b = np.zeros((128, 128), dtype=int)
         self.file_io = FileIO()
         self.ui_renderer = UIRenderer(self)
+
+        root = tk.Tk()
+        root.withdraw()
 
         pygame.init()
 
