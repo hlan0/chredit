@@ -23,9 +23,6 @@ class App:
         self.file_io = FileIO()
         self.ui_renderer = UIRenderer(self)
 
-        root = tk.Tk()
-        root.withdraw()
-
         pygame.init()
 
         self.screen = pygame.display.set_mode(
@@ -187,12 +184,17 @@ class App:
             print('Could not save file: File not found')
         except json.JSONDecodeError:
             print('Could not save file: JSON decode error')
+        except TypeError:
+            print('Could not save file: Type error')
 
     def import_data(self):
         """
         Imports data from a JSON file.
         """
         try:
+            root = tk.Tk()
+            root.withdraw()
+            root.call('wm', 'attributes', '.', '-topmost', True)
             file_path = filedialog.askopenfilename(
                 initialdir='.', filetypes=[('JSON Files', '*.json')])
 
@@ -217,6 +219,8 @@ class App:
             print('Could not load file: File not found')
         except json.JSONDecodeError:
             print('Could not load file: JSON decode error')
+        except TypeError:
+            print('Could not load file: Type error')
 
     def write_to_file(self) -> None:
         """
@@ -268,6 +272,8 @@ class App:
             print('Could not save files: Not a directory')
         except IOError:
             print('Could not save files: IO Error')
+        except TypeError:
+            print('Could not save files: Type Error')
 
     def open_chr_file(self) -> None:
         """
