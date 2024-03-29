@@ -22,6 +22,7 @@ class App:
         self.table_b = np.zeros((128, 128), dtype=int)
         self.file_io = FileIO()
         self.ui_renderer = UIRenderer(self)
+        self.current_dir = os.path.dirname(os.path.realpath(__file__))
 
         pygame.init()
 
@@ -177,7 +178,8 @@ class App:
         }
         try:
             file_path = filedialog.asksaveasfilename(
-                initialdir='.', filetypes=[('JSON Files', '*.json')])
+                initialdir=self.current_dir, filetypes=[('JSON Files', '*.json')])
+            self.current_dir = os.path.dirname(file_path)
             with open(file_path, 'w', encoding='utf-8') as file:
                 json.dump(serialized, file)
         except FileNotFoundError:
@@ -196,8 +198,8 @@ class App:
             root.withdraw()
             root.call('wm', 'attributes', '.', '-topmost', True)
             file_path = filedialog.askopenfilename(
-                initialdir='.', filetypes=[('JSON Files', '*.json')])
-
+                initialdir=self.current_dir, filetypes=[('JSON Files', '*.json')])
+            self.current_dir = os.path.dirname(file_path)
             with open(file_path, 'r', encoding='utf-8') as file:
                 serialized = json.load(file)
             self.table_a = np.array(serialized['table_a'])
@@ -226,8 +228,9 @@ class App:
         """
         Exports data to C header files.
         """
-        destination_folder = filedialog.askdirectory(initialdir='.')
+        destination_folder = filedialog.askdirectory(initialdir=self.current_dir)
         try:
+            self.current_dir = os.path.dirname(destination_folder)
             with open(os.path.join(destination_folder, 'metatiles.h'), 'w', encoding='utf-8') as file:
                 file.write('const unsigned char metatiles[] = {\n')
                 for i in range(48):
@@ -259,7 +262,7 @@ class App:
                     file.write('};\n\n')
 
             with open(os.path.join(destination_folder, 'palettes.h'), 'w', encoding='utf-8') as file:
-                file.write('const unsigned char palettes[] = {\n')
+                file.write('const unsigned char palette_bg[] = {\n')
                 for i in range(4):
                     file.write('\t')
                     for j in range(4):
@@ -281,11 +284,14 @@ class App:
         """
         try:
             file_path = filedialog.askopenfilename(
-                initialdir=".", filetypes=[('CHR Files', '*.chr')])
+                initialdir=self.current_dir, filetypes=[('CHR Files', '*.chr')])
+            self.current_dir = os.path.dirname(file_path)
             self.table_a, self.table_b = self.file_io.read_file(file_path)
             self.tiles.raw_tiles = self.table_a
         except FileNotFoundError:
             print('Could not open file: File not found')
+        except TypeError:
+            print('Could not open file: Type error')
 
     def switch_mode_tiles(self) -> None:
         """
